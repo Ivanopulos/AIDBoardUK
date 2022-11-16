@@ -43,28 +43,37 @@ def toxls12():  # соединение в один дф
     d_df.to_pickle("./d_df.pkl ")
     print('pkl out')
     return d_df
-if os.path.isfile("./d_df.pkl"):
+def och(d_df):                                            # очистка го и ук
     d_df = pd.read_pickle("./d_df.pkl ")
+    d_df.columns = d_df.iloc[0]                       # в заголовок первую теперь уже строку
+    d_df = d_df.iloc[1:]                              # удалить строку переехавшую в заголовок
+    d_df['ОМСУ'] = d_df['ОМСУ'].str.replace("г. о. ", "")
+    d_df['Исполнитель'] = d_df['Исполнитель'].str.replace(" *\d", "", regex=True)  # удаление двойников с цифрами
+    d_df = d_df.query('ОМСУ == "Химки" or ОМСУ == "Лобня" or ОМСУ == "Кашира" or ОМСУ == "Солнечногорск" or ОМСУ == "Чехов"')  # зачистка го(и артефактов свода/лишние заголовки)
+    s_ddf = pd.read_excel("./Словарь_управляшек.xlsx ", index_col=0)
+    s_uk = list(s_ddf['Наименование УК'])
+    d_df = d_df[d_df.Исполнитель.isin(s_uk)]
+    s_uk1 = list(s_ddf['Статус'])
+    d_df = d_df[d_df.Статус.isin(s_uk1)]
+    d_df = d_df[~d_df.Описание.str.startswith('Номер Добродела')]
+    return d_df
+
+if os.path.isfile("./chk.xlsx"):               # если уже очищено
+    d_df = pd.read_excel("./chk.xlsx")
+    print(1)
 else:
-    d_df = toxls12()
-# очистка от лишнего
-d_df = pd.read_pickle("./d_df.pkl ")
-d_df.columns = d_df.iloc[0]                       # в заголовок первую теперь уже строку
-d_df = d_df.iloc[1:]                              # удалить строку переехавшую в заголовок
-d_df['ОМСУ'] = d_df['ОМСУ'].str.replace("г. о. ", "")
-d_df['Исполнитель'] = d_df['Исполнитель'].str.replace(" *\d", "", regex=True)  # удаление двойников с цифрами
-d_df = d_df.query('ОМСУ == "Химки" or ОМСУ == "Лобня" or ОМСУ == "Кашира" or ОМСУ == "Солнечногорск" or ОМСУ == "Чехов"')  # зачистка го(и артефактов свода/лишние заголовки)
-s_ddf = pd.read_excel("./Словарь_управляшек.xlsx ", index_col=0)
-s_uk = list(s_ddf['Наименование УК'])
-print(s_ddf)
-d_df = d_df[d_df.Исполнитель.isin(s_uk)]
-s_uk1 = list(s_ddf['Статус'])
-d_df = d_df[d_df.Статус.isin(s_uk1)]
-#d_df = d_df.isin({'Исполнитель': s_uk})
-#df.isin({'Исполнитель': [0, 3]})
+    if not os.path.isfile("./d_df.pkl"):       # если ничего вообще не делалось
+        d_df = toxls12()
+        print(2)
+    else:
+        d_df = pd.read_pickle("./d_df.pkl ")   # если уже объединено но не чищено
+        print(3)
+    d_df = och(d_df)                           # очистка
+
+d_df.to_excel('./chk.xlsx')
 print(d_df)
+
+#df.isin({'Исполнитель': [0, 3]})
 # d_df['оставляем'] = 0
 # d_df['оставляем'] = np.where(d_df['ОМСУ'] == "Химки", d_df['оставляем']+1, d_df['оставляем'])
-#print(d_df)
-d_df.to_excel('./chk.xlsx')
 
