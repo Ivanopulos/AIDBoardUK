@@ -5,7 +5,7 @@ import pandas as pd
 import os
 from tkinter import filedialog
 import traceback
-import re
+import regex as re
 import warnings
 warnings.simplefilter("ignore")  # dftmp = pd.read_excel(d_path+filename)
 def p():
@@ -47,33 +47,50 @@ def och(d_df):                                            # очистка го 
     d_df = pd.read_pickle("./d_df.pkl ")
     d_df.columns = d_df.iloc[0]                       # в заголовок первую теперь уже строку
     d_df = d_df.iloc[1:]                              # удалить строку переехавшую в заголовок
-    d_df['ОМСУ'] = d_df['ОМСУ'].str.replace("г. о. ", "")
-    d_df['Исполнитель'] = d_df['Исполнитель'].str.replace(" *\d", "", regex=True)  # удаление двойников с цифрами
+    d_df['ОМСУ'] = d_df['ОМСУ'].str.replace("г. о. ", "")# удаление го для приведения к единому виду с базой
+    d_df['Исполнитель'] = d_df['Исполнитель'].str.replace(" *\d", "", regex=True)  # удаление двойников с цифрами типа МО 55555 с пробелом
     d_df = d_df.query('ОМСУ == "Химки" or ОМСУ == "Лобня" or ОМСУ == "Кашира" or ОМСУ == "Солнечногорск" or ОМСУ == "Чехов"')  # зачистка го(и артефактов свода/лишние заголовки)
     s_ddf = pd.read_excel("./Словарь_управляшек.xlsx ", index_col=0)
     s_uk = list(s_ddf['Наименование УК'])
     d_df = d_df[d_df.Исполнитель.isin(s_uk)]
     s_uk1 = list(s_ddf['Статус'])
     d_df = d_df[d_df.Статус.isin(s_uk1)]
-    d_df = d_df[~d_df.Описание.str.startswith('Номер Добродела')]
+    #d_df = d_df[~d_df.Описание.str.startswith('Номер Добродела')]
     return d_df
-
-if os.path.isfile("./chk.xlsx"):               # если уже очищено
+if os.path.isfile("./chk.xlsx"):                                                                      # если уже очищено
     d_df = pd.read_excel("./chk.xlsx")
     print(1)
 else:
-    if not os.path.isfile("./d_df.pkl"):       # если ничего вообще не делалось
+    if not os.path.isfile("./d_df.pkl"):                                                # если ничего вообще не делалось
         d_df = toxls12()
         print(2)
     else:
-        d_df = pd.read_pickle("./d_df.pkl ")   # если уже объединено но не чищено
+        d_df = pd.read_pickle("./d_df.pkl ")                                          # если уже объединено но не чищено
         print(3)
-    d_df = och(d_df)                           # очистка
+    d_df = och(d_df)                                                                                                    # очистка
+#kdf=d_df
+d_df["корд"] = d_df['Описание'].str.extract(r"(5[456][.,]\d{3,8}\D{1,10}3[678][.,]\d{3,8})+")                           # формирование столбцов с координатами
+d_df["Описание"] = d_df['Описание'].str.replace(r"5[456][.,]\d{2,8}\D{1,10}3[678][.,]\d{2,8}", "", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{5,}", "", regex=True)                                              # стирает более чем 3знач числа
+d_df['Описание'] = d_df['Описание'].str.replace(r"([0123][0123456789]\D{1,2}[01][0123456789]\D{1,2}20{,1}2{,1}2)+", "", regex=True)  # чистим даты из текста
+d_df = d_df.loc[(d_df['Описание'].str.len() > 40)|(d_df['корд'].str.len() > 2)]                                         # строка длинее 40
+d_df['Описание'] = d_df['Описание'].str.replace(r"Вопрос 1", "zzz", regex=True)                                         # заменяем цифру от фраззы чтоб не мешала удалять по признаку цифры
+d_df = d_df[~d_df['Описание'].str.contains(r"zzz\D{,2}1{,1}.{,1}$", regex=True)]                                        # Вопрос 1 в конце как признак битости строки
+d_df['Описание'] = d_df['Описание'].str.replace(r"202\d", "", regex=True)#7
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{,9}[,.]{,1}\d{1,9}\D{,2}рубл[яе]", "", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{,9}[,.]{,1}\d{1,9}\D{,2}копе[йие]", "", regex=True)#1!!!
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{,2}-{,1}й{,1} {,1}под[ьъ]езда{,1} {,1}\d{,2}", "", regex=True) #10
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,3} ?%", "", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,3} ?суто?ки?", "", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,3} ?этаже?", "", regex=True)
 
-d_df.to_excel('./chk.xlsx')
-print(d_df)
+d_df['Описание'] = d_df['Описание'].str.replace(r"\d[еягй]?-?[еягй]?о?", "\d", regex=True)
 
+d_df = d_df[d_df['Описание'].str.contains(r'\d{1,}', regex=True)|(d_df['корд'].str.len() > 2)]                          # есть хотябы одна цифра
+
+
+print(d_df['Описание'])
+d_df.to_excel('./chk1.xlsx')
 #df.isin({'Исполнитель': [0, 3]})
-# d_df['оставляем'] = 0
-# d_df['оставляем'] = np.where(d_df['ОМСУ'] == "Химки", d_df['оставляем']+1, d_df['оставляем'])
+
 
