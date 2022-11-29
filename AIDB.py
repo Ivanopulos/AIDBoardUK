@@ -37,7 +37,7 @@ def och(d_df):                                            # очистка го 
     d_df = d_df[d_df.Статус.isin(s_uk1)]
     #d_df = d_df[~d_df.Описание.str.startswith('Номер Добродела')]
     return d_df
-def chk1(d_df):
+def chk1(d_df):  # очистка цифр
     d_df["корд"] = d_df['Описание'].str.extract(r"(5[456][\.,]\d{4,8}\D{1,10}3[678][\.,]\d{4,8})+")  # формирование столбцов с координатами
     d_df["корд"] = d_df["корд"].str.replace(r"(\d\d)[\.,](\d{4,8})\D{1,10}(3[678])[\.,](\d{4,8})", r"[\1.\2,\3.\4]", regex=True)  # стандарт написания
     d_df["Описание"] = d_df['Описание'].str.replace(r"5[456][\.,]\d{2,8}\D{1,10}3[678][\.,]\d{2,8}", "", regex=True)  # удаление координат
@@ -45,10 +45,31 @@ def chk1(d_df):
     # d_df['Описание'] = d_df['Описание'].str.replace(r'\-', "/", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r'[^0-9а-яА-Я \.,/ёЁ\\№\-]', "", regex=True)  # а-яА-Я ёЁйЙ.,\-
     d_df['Описание'] = d_df['Описание'].str.replace(r'\d{2,}[/\.\-]\d{2,}[/\. \-]\d{2,}', "", regex=True)  # всякие номера типа ххх-хх-хх не захв 8 (498) 000-00-00
-    d_df['Описание'] = d_df['Описание'].str.replace(r'[87]? ?\(\d{3,}\)', "", regex=True)  # остатки ном тел но походу ничего не дает
+    d_df['Описание'] = d_df['Описание'].str.replace(r'[87]?\-? ?\(\d{2,}\)?', "", regex=True)  # остатки ном тел но походу ничего не дает
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ ?года?', "", regex=True)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+[^\.]?фз', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d?[,\.\-]?\d+ ?лет(?! октября)', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ января', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ февраля', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ апреля', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ июня', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ июля', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ августа', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ сентября', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ октября', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ ноября', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ декабря', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d?[012345679] марта', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d?[012345678] мая', "", regex=True, flags=re.IGNORECASE)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d{1,2}\.\d{2}', "", regex=True)                                  # 01.30
+    d_df['Описание'] = d_df['Описание'].str.replace(r'тел\. [78]\-?\d+', "", regex=True, flags=re.IGNORECASE)           # тел и остатки
+    d_df['Описание'] = d_df['Описание'].str.replace(r'квартира \d+', "", regex=True, flags=re.IGNORECASE)
     d_df['Описание'] = d_df['Описание'].str.replace(r'\d{4,}', "", regex=True)
+    #d_df['на проверку'] = d_df['Описание'].str.extract(r'(\d+\-\d+)+')
+    d_df['Описание'] = d_df['Описание'].str.replace(r'(\d+)\-\d+', r"\1", regex=True, flags=re.IGNORECASE)              # может жрать корпуса формата а-б
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\bкв\.? ?\d+', "", regex=True, flags=re.IGNORECASE)  # квартира
     d_df['Описание'] = d_df['Описание'].str.replace(r'\d+ раз[ \.,]', "", regex=True)
-    d_df['Описание'] = d_df['Описание'].str.replace(r'\d?[,\.\-]?\d+ месяц', "", regex=True)
+    d_df['Описание'] = d_df['Описание'].str.replace(r'\d?[,\.\-]?\d+ месяц', "", regex=True, flags=re.IGNORECASE)
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d\d[\.\-:]00", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"\dх", "", regex=True)
     d_df = d_df.loc[(d_df['Описание'].str.len() > 40) | (d_df['корд'].str.len() > 2)]  # строка длинее 40
@@ -56,13 +77,15 @@ def chk1(d_df):
     d_df = d_df[~d_df['Описание'].str.contains(r"zzz\D{,2}1{,1}\.{,1}$", regex=True)]  # Вопрос 1 в конце как признак битости строки
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d{,9}[,\.]{,1}\d{1,9}\D{,2}рубл[яе][й ,\.]", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d{,9}[,\.]{,1}\d{1,9}\D{,2}копе[йие]", "", regex=True)  # 1!!!
-    d_df['Описание'] = d_df['Описание'].str.replace(r"(\d)[еягй]?\-?[еягй]?о?", r"\1", regex=True)  # 9-й в 9
-    d_df['Описание'] = d_df['Описание'].str.replace(r" \d{,2}\-{,1}й{,1}г?о? {,1}[пП]од[ьъ]езда{,1}е{,1}о?м? {,1}\d{,2}", "", regex=True)  # 10
+    d_df['Описание'] = d_df['Описание'].str.replace(r"(\d)[еягй]?\-?[еягй]?о?", r"\1", regex=True)                      # 9-й в 9 мая и тп
+    d_df['Описание'] = d_df['Описание'].str.replace(r" ?\d{,2}\-?й?г?о? ?под[ьъ]езда?е?о?м?\s?\d{,2}", "", regex=True, flags=re.IGNORECASE)  # 10
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,3} ?%", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,3} ?суто?ки?", "", regex=True)
+    d_df['Описание'] = d_df['Описание'].str.replace(r"\d+ ?\-?й? ?д[не][яне][ьй]?\b", "", regex=True)                     # дней
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,3} ?[эЭ]таже?", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"[012]?[0-9]:[012]?[0-9]", "", regex=True)  # time6968614-1
     d_df['Описание'] = d_df['Описание'].str.replace(r"[эЭ]таж ?\d{1,3}", "", regex=True)
+    d_df['Описание'] = d_df['Описание'].str.replace(r"\d* квартир[ае]? №?\d*", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"[оО]ценка \d", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"[рР]ассмотрение \d", "", regex=True)
     d_df['Описание'] = d_df['Описание'].str.replace(r"[вВ]опрос \d", "", regex=True)
@@ -82,21 +105,17 @@ def rasp(x):
     u = s_adf1.columns.get_loc("улица")
     d = s_adf1.columns.get_loc('дом')
     e = s_adf1.columns.get_loc('есхожд')
-    a = x["Описание"]
+    a = str(x["Описание"]).lower()
     for i in range(1, len(s_adf1)):
-        b = s_adf1.iloc[i, u]
-        c = s_adf1.iloc[i, d]
-        if a.find(b) > 1 and a.find(c) > 1: # and (x["Описание"].find(str(s_adf1.iloc[i]["дом"]))>1
+        b = s_adf1.iloc[i, u].lower()  # ул
+        c = "#"+str(s_adf1.iloc[i, d]).lower()+'#'  # дом обособлено для поиска границ номера
+        if a.find(b) > 1 and a.find(c) > 1:  # and (x["Описание"].find(str(s_adf1.iloc[i]["дом"]))>1
             s_adf1.iloc[i, e] = 1
-            #print(s_adf1.iloc[i, e])
-    #tmp=s_adf1['есхожд'].sum()
-    #print(tmp)
     t=t+1
     if int(t/100)==t/100:
         print(t)
     if s_adf1['есхожд'].sum() == 1:
-        itg = s_adf1[s_adf1["есхожд"] == 1]["Адрес в образце"]
-        return itg
+        return s_adf1[s_adf1["есхожд"] == 1]["Адрес в образце"].values[0]
 if not os.path.isfile("./d_df.pkl"):
     d_df = toxls12()  # сбор
     d_df.to_excel('./d_df.xlsx')
@@ -107,8 +126,8 @@ if not os.path.isfile("./d_df.pkl"):
     d_df.to_excel('./chk.xlsx', engine='xlsxwriter')
     print('chk out')
 if not os.path.isfile("./chk1.xlsx"):
-    d_df = pd.read_excel("./chk.xlsx")  # очистка от битых
-    d_df = chk1(d_df)
+    d_df = pd.read_excel("./chk.xlsx")
+    d_df = chk1(d_df)  # выявление битых
     print('chk1 out')
 s_adf = pd.read_excel("./адрес стандарт.xlsx")
 s_adf["ОМСУ"] = s_adf["ОМСУ"].str.replace(r' г о', "", regex=True)
@@ -119,9 +138,15 @@ except:
     d_df = pd.read_excel("./chk1.xlsx")
     print("chk1 eated")
 t = 0
+d_df['Описание'] = d_df['Описание'].str.replace(r'a', "а", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r',? ?корп[\.]?у?с?[ао]?м? ?', "к", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r'(\d) (к)[ \.](\d)', r"\1\2\3", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r'московская обла?с?т?ь?', "", regex=True, flags=re.IGNORECASE)
+d_df['Описание'] = d_df['Описание'].str.replace(r'(?!коловская )(\d+)(?! Лесн)(?! м)(?! кв)(?! мичур)(?! желез) ?([жабкв\\/\-]{,3})(\d{,2})', r"#\1\2\3#", regex=True, flags=re.IGNORECASE)  #^р чтобы исключить 9 квартал созвучен с к поэтому к в исключения нельзя
 d_df["распознано"] = d_df.apply(rasp, axis=1)
+#d_df['Описание'] = d_df['Описание'].str.replace(r'#', "", regex=True)
 d_df.to_excel("./chk2.xlsx")
-print(d_df["распознано"])
+#print(d_df["распознано"])
 
 #pd.options.display.max_colwidth = 1000
 #print(str(d_df[d_df["Номер ЕЦУР"] == "7500157-2"]["Описание"]).encode("UTF-8"))7258977-1
