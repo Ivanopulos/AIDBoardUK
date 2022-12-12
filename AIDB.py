@@ -1,15 +1,18 @@
 # d_ папка и файлы детализации d_df d_path
 # s_ словари s_uk/s_uk1 s_ddf/s_adf s_adf1
 # s_ddf словарь управляшек <01/мм*3/гггг> need to renew
+# s_skl словарь склонений
+# s_sdf1 tmp словарь свода улицодомов
 # c_ результаты сведения
 # путь по файлам:
 #   запрос в одой папке входящих,
 #   d_df.pkl/xlsx(итог сбора 10)
 #   chk.xlsx(итог фильтров го и коллекции ук по ./Словарь_управляшек.xlsx )
 #   chk1.xlsx(итог, определение, удаление мусорных, очистка цифр)
-#   chk2.xlsx(распознание по единственному совпадению)
+#   chk2.xlsx(распознание по единственному совпадению и стандарт корпусов и разметки)
 #   адрес_стандарт.xlsx(база возможной комбинации ул.дом.омсу.ук.написание в базе координат)
-#   адреса.xlsx(коллекция координат)
+#   Адреса.xlsx(коллекция координат)
+#   склонения.xlsx
 import time
 import numpy as np
 import pandas as pd #pip install xlsxwriter
@@ -17,6 +20,7 @@ import os
 from tkinter import filedialog
 import regex as re
 import warnings
+import datetime
 warnings.simplefilter("ignore")  # dftmp = pd.read_excel(d_path+filename)
 def toxls12():  # соединение в один дф
     d_df = pd.DataFrame()                         # дф для сборки файлов
@@ -102,7 +106,8 @@ def chk1(d_df):  # очистка цифр
     d_df['Описание'] = d_df['Описание'].str.replace(r'\d?[,\.\-]?\d+ месяц', "", regex=True, flags=re.IGNORECASE)
     d_df['Описание'] = d_df['Описание'].str.replace(r'месяца \d(?! дом)(?! д\.)', "", regex=True, flags=re.IGNORECASE)
     d_df['Описание'] = d_df['Описание'].str.replace(r"\d?\d ?[\.\-:] ?00", "", regex=True)#23:00
-    d_df['Описание'] = d_df['Описание'].str.replace(r"\dх", "", regex=True)
+    d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,2}\-?х", "", regex=True)
+    d_df['Описание'] = d_df['Описание'].str.replace(r"\d{1,2}\-?ти", "", regex=True)
     d_df = d_df.loc[(d_df['Описание'].str.len() > 20) | (d_df['корд'].str.len() > 2)]  # строка длинее 40
     d_df['Описание'] = d_df['Описание'].str.replace(r"Вопрос 1", "zzz", regex=True)  # заменяем цифру от фраззы чтоб не мешала удалять по признаку цифры
     d_df = d_df[~d_df['Описание'].str.contains(r"zzz\D{,2}1{,1}\.{,1}$", regex=True)]  # Вопрос 1 в конце как признак битости строки
@@ -136,8 +141,6 @@ def rasp(x):
         s_adf1 = s_adf1.drop_duplicates(["ОМСУ", "дом", "улица"])
     else:
         s_adf1 = s_adf[(s_adf.ОМСУ == x["ОМСУ"])&(s_adf.УК == x["Исполнитель"])]
-    s_adf1['есхожд'] = 0#!!!!!!!!!!!!!!!!!убрать за функцию в с_адф
-    s_adf1['улица'] = s_adf1['улица'].str.replace(r'.+, ', "", regex=True)  # сначала с краю от запятой
     a = str(x["Описание"]).lower()  # входящий на функцию
     d = s_adf1.columns.get_loc('дом')
     e = s_adf1.columns.get_loc('есхожд')  # столбец для суммы
@@ -153,31 +156,59 @@ def rasp(x):
         print(t)
     if s_adf1['есхожд'].sum() == 1:
         return s_adf1[s_adf1["есхожд"] == 1]["Адрес в образце"].values[0]
-    elif s_adf1['есхожд'].sum() == 0 and not x["Исполнитель"] == "Непосредственное управление":
+    elif s_adf1['есхожд'].sum() == 0: #and not x["Исполнитель"] == "Непосредственное управление":
         s_adf1 = s_adf[(s_adf.ОМСУ == x["ОМСУ"])]
         s_adf1 = s_adf1.drop_duplicates(["ОМСУ", "дом", "улица"])
-        s_adf1['есхожд'] = 0
-        s_adf1['улица'] = s_adf1['улица'].str.replace(r'.+, ', "", regex=True)  # сначала с краю от запятой
         for i in range(0, len(s_adf1)):
             b = "z" + s_adf1.iloc[i, u].lower() + "z"  # ул
             c = "#" + str(s_adf1.iloc[i, d]).lower() + '#'  # дом обособлено для поиска границ номера
             f = a.find(b)
-            # if x["Номер ЕЦУР"] == "7658034-1" and c == "#13#":
-            #     print(a.find(c))
-            #     print(b)
-            #     print(c)
-            #     print(d)
-            #     print(e)
-            #     print(f)
-            if f >= 0 and a.find(c) >= 0:
+            if f >= 0 and a.find(c) >= 0:# ИМЕЕТ ДУБЛЕРА
                 s_adf1.iloc[i, e] = 1
         if s_adf1['есхожд'].sum() == 1:
             g = str(s_adf1[s_adf1["есхожд"] == 1]["Адрес в образце"].values[0]) + "КОСЯК УК"
             return g
         elif s_adf1['есхожд'].sum() > 1:
-            return "СТАЛО НЕПОНЯТНО"
+            return ""#СТАЛО НЕПОНЯТНО"
         else:
-            return "НЕ НАЙДЕНО"
+            #pd.merge(s_adf1, s_skl, how='left', on='улица')  # тащим склонения
+            s_adf1=s_adf1.merge(s_skl[['улица', 'склон']], on='улица')
+            s_adf1.dropna(subset=['склон'], inplace=True)
+            #print(s_adf1)
+            s_adf1['улица'] = s_adf1['склон']
+            for i in range(0, len(s_adf1)):
+                b = "z" + s_adf1.iloc[i, u].lower() + "z"  # ул
+                c = "#" + str(s_adf1.iloc[i, d]).lower() + '#'  # дом обособлено для поиска границ номера
+                f = a.find(b)
+                if f >= 0 and a.find(c) >= 0:  # ИМЕЕТ ДУБЛЕРА
+                    s_adf1.iloc[i, e] = 1
+            if s_adf1['есхожд'].sum() == 1:
+                g = str(s_adf1[s_adf1["есхожд"] == 1]["Адрес в образце"].values[0]) + "НАЙДЕНО ПО СКЛОНЕНИЮ"
+                return g
+            else:
+                return ""#НЕ НАЙДЕНО"
+    else:
+        #print(s_adf1['есхожд'].sum(), 1)
+        s_adf1 = s_adf1[s_adf1.есхожд == 1]
+        #print(s_adf1['есхожд'].sum(), 2)
+        for i in range(0, len(s_adf1)):
+            b = "z" + s_adf1.iloc[i, u].lower() + "z"  # ул
+            c = "#" + str(s_adf1.iloc[i, d]).lower() + '#'  # дом обособлено для поиска границ номера
+            ul = re.finditer(b, a)
+            do = re.finditer(c, a)
+            dlt = 999
+            for ul1 in ul:
+                for do1 in do:
+                    if dlt > abs(ul1.span()[1]-do1.span()[0]):
+                        dlt = abs(ul1.span()[1]-do1.span()[0])  # самая близкая пара
+            s_adf1.iloc[i, e] = dlt
+        g1 = s_adf1['есхожд'].min()
+        #print(g1, 3)
+        g = str(s_adf1[s_adf1["есхожд"] == g1]["Адрес в образце"].values[0]) + "НАЙДЕНО ПО МНОЖЕСТВУ"
+        #print(g, 4)
+        return g
+dtcntrl = datetime.datetime.now()
+print(dtcntrl)
 if not os.path.isfile("./d_df.pkl"):
     d_df = toxls12()  # сбор
     d_df.to_excel('./d_df.xlsx')
@@ -191,33 +222,46 @@ if not os.path.isfile("./chk1.xlsx"):
     d_df = pd.read_excel("./chk.xlsx")
     d_df = chk1(d_df)  # выявление битых
     print('chk1 out')
-s_adf = pd.read_excel("./адрес стандарт.xlsx")
-s_adf["ОМСУ"] = s_adf["ОМСУ"].str.replace(r' г о', "", regex=True)
-s_adf["улица"] = s_adf["улица"].str.replace(r' \d+', "", regex=True)
-s_adf["улица"] = s_adf["улица"].str.replace(r'\d+ ', "", regex=True)
-s_adf["улица"] = s_adf["улица"].str.replace(r'\-?\d+', "", regex=True)
-s_adf["дом"] = s_adf["дом"].str.replace(r'/', "к", regex=True)
 try:
     if len(d_df) < 10:
         print("low len")
 except:
     d_df = pd.read_excel("./chk1.xlsx")
     print("chk1 eated")
+
+s_skl = pd.read_excel("./склонения.xlsx")
+s_adf = pd.read_excel("./адрес стандарт.xlsx")
+s_adf["ОМСУ"] = s_adf["ОМСУ"].str.replace(r' г о', "", regex=True)
+s_adf["улица"] = s_adf["улица"].str.replace(r' \d+', "", regex=True)
+s_adf["улица"] = s_adf["улица"].str.replace(r'\d+ ', "", regex=True)
+s_adf["улица"] = s_adf["улица"].str.replace(r'\-?\d+', "", regex=True)
+s_adf["дом"] = s_adf["дом"].str.replace(r'/', "к", regex=True)
+s_adf['есхожд'] = 0  # для суммы совпадений не дублировать
+s_adf['улдлясплита'] = s_adf['улица']
+s_adf['улица'] = s_adf['улица'].str.replace(r'.+, ', "", regex=True)  # сначала с краю от запятой
+
 t = 0
 d_df['Описание'] = d_df['Описание'].str.replace(r'/', "к", regex=True)
-d_df['Описание'] = d_df['Описание'].str.replace(r',? ?корп[\.]?у?с?[ао]?м? ?', "к", regex=True)
+d_df['Описание'] = d_df['Описание'].str.replace(r',? ?корп?[\.]?у?с?[ао]?м? ?', "к", regex=True)
 d_df['Описание'] = d_df['Описание'].str.replace(r'(\d+),? ?стр(оение)?\.? ?(\d+)', r"\1к\3", regex=True)
 d_df['Описание'] = d_df['Описание'].str.replace(r'(\d)[ ,\.]{,2}(к)[ \.]{,2}(\d{1,2})', r"\1\2\3", regex=True)
-d_df['Описание'] = d_df['Описание'].str.replace(r'московская обла?с?т?ь?', "", regex=True, flags=re.IGNORECASE)
+d_df['Описание'] = d_df['Описание'].str.replace(r'московск[оа][йя] обла?с?т?и?ь?', "", regex=True, flags=re.IGNORECASE)
 d_df['Описание'] = d_df['Описание'].str.replace(r'(\d+ )в ', r"\1", regex=True, flags=re.IGNORECASE)
 d_df['Описание'] = d_df['Описание'].str.replace(r'(?<!коловская )(?<!Чехов )(?<!завода )(?<!квартал )(\d+)(?! лет)(?!0 лет)(?! мая)(?! март)(?! кв)(?! сев)(?! дачн)(?! желез)(?! чапа)(?! ур)(?! пионер)(?! первом)(?! гвард) ?\-?(/?[абфкв]{,2}(?![а-я]))? ?(\d*)', r"#\1\2\3#", regex=True, flags=re.IGNORECASE)
-d_df['Описание'] = d_df['Описание'].str.replace(r'77 ?ж\b', "#77ж#", regex=True, flags=re.IGNORECASE)
+d_df['Описание'] = d_df['Описание'].str.replace(r'77 ?ж\b', "#77ж#", regex=True, flags=re.IGNORECASE)#???? если при
 d_df['Описание'] = d_df['Описание'].str.replace(r'([а-яА-Я]{3,})', r"z\1z", regex=True, flags=re.IGNORECASE)
 d_df["распознано"] = d_df.apply(rasp, axis=1)
 d_df.to_excel("./chk2.xlsx")
-
+print(datetime.datetime.now(), datetime.datetime.now()-dtcntrl)
 #pd.options.display.max_colwidth = 1000
 #print(str(d_df[d_df["Номер ЕЦУР"] == "7500157-2"]["Описание"]).encode("UTF-8"))7258977-1
 #print(d_df[d_df["Номер ЕЦУР"] == "7258977-1"]["Описание"])
 #print(b'\xb2\xd0\xb0 -5910223 \xd0\x9e\xd1'.decode("utf-8", "ignore"))
+# if x["Номер ЕЦУР"] == "6587442-1" and c == "#17к6#":
+#     print(a.find(c))
+#     print(b)
+#     print(c)
+#     print(d)
+#     print(e)
+#     print(f)
 
